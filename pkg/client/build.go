@@ -307,10 +307,13 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		return errors.Wrapf(err, "invalid builder '%s'", opts.Builder)
 	}
 
+	c.logger.Infof("fetchBuilder start")
 	rawBuilderImage, err := c.imageFetcher.Fetch(ctx, builderRef.Name(), image.FetchOptions{Daemon: true, PullPolicy: opts.PullPolicy})
 	if err != nil {
+		c.logger.Infof("fetchBuilder end")
 		return errors.Wrapf(err, "failed to fetch builder image '%s'", builderRef.Name())
 	}
+	c.logger.Infof("fetchBuilder end")
 
 	bldr, err := c.getBuilder(rawBuilderImage)
 	if err != nil {
@@ -345,10 +348,13 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		return err
 	}
 
+	c.logger.Infof("fetchBuildpack start")
 	fetchedBPs, order, err := c.processBuildpacks(ctx, bldr.Image(), bldr.Buildpacks(), bldr.Order(), bldr.StackID, opts)
 	if err != nil {
+		c.logger.Infof("fetchBuildpack end")
 		return err
 	}
+	c.logger.Infof("fetchBuildpack end")
 
 	if err := c.validateMixins(fetchedBPs, bldr, runImageName, runMixins); err != nil {
 		return errors.Wrap(err, "validating stack mixins")
@@ -481,9 +487,12 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 	if lifecycleSupportsCreator && opts.TrustBuilder(opts.Builder) {
 		lifecycleOpts.UseCreator = true
 		// no need to fetch a lifecycle image, it won't be used
+		c.logger.Infof("lifecycleExecutor start")
 		if err := c.lifecycleExecutor.Execute(ctx, lifecycleOpts); err != nil {
+			c.logger.Infof("lifecycleExecutor end")
 			return errors.Wrap(err, "executing lifecycle")
 		}
+		c.logger.Infof("lifecycleExecutor end")
 
 		return c.logImageNameAndSha(ctx, opts.Publish, imageRef)
 	}
@@ -524,9 +533,12 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		}
 	}
 
+	c.logger.Infof("lifecycleExecutor start")
 	if err := c.lifecycleExecutor.Execute(ctx, lifecycleOpts); err != nil {
+		c.logger.Infof("lifecycleExecutor end")
 		return errors.Wrap(err, "executing lifecycle. This may be the result of using an untrusted builder")
 	}
+	c.logger.Infof("lifecycleExecutor end")
 
 	return c.logImageNameAndSha(ctx, opts.Publish, imageRef)
 }
