@@ -3,6 +3,7 @@ import datetime
 
 format = '%Y/%m/%d %H:%M:%S.%f'
 
+PACK = "./out/pack" # location of pack binary
 
 def run(command):
     print(command)
@@ -45,25 +46,25 @@ def run(command):
 
 def laterBuild(imageName):
     builder = "paketobuildpacks/builder:base"
-    command = "pack build " + imageName + " --builder " + builder + " --timestamps -v"
+    command = PACK + " build " + imageName + " --builder " + builder + " --timestamps -v"
     return run(command)
 
 
 def tinyBuild(imageName):
     builder = "paketobuildpacks/builder:tiny"
-    command = "pack build " + imageName + " --builder " + builder + " --timestamps -v"
+    command = PACK + " build " + imageName + " --builder " + builder + " --timestamps -v"
     return run(command)
 
 
 def neverBuild(imageName):
     builder = "paketobuildpacks/builder:base"
-    command = "pack build " + imageName + " --builder " + builder + " --pull-policy never --timestamps -v"
+    command = PACK + " build " + imageName + " --builder " + builder + " --pull-policy never --timestamps -v"
     return run(command)
 
 
 def alwaysBuild(imageName):
     builder = "paketobuildpacks/builder:base"
-    command = "pack build " + imageName + " --builder " + builder + " --pull-policy always --timestamps -v"
+    command = PACK + " build " + imageName + " --builder " + builder + " --pull-policy always --timestamps -v"
     return run(command)
 
 
