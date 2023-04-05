@@ -3,16 +3,22 @@ import datetime
 
 format = '%Y/%m/%d %H:%M:%S.%f'
 
-PACK = "./out/pack" # location of pack binary
+PACK = "./out/pack"  # location of pack binary
 
-def run(command):
+username = "edithwu"
+
+N = 5
+k = 2
+
+
+def run(command, out, error="error.out"):
     print(command)
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command, shell=True, stdout=open(out, "w"), stderr=open(error, "w"))
 
     process.wait()
 
-    output = process.stdout.read().decode(encoding="gbk")
-    error = process.stderr.read().decode(encoding="gbk")
+    output = open(out).read()
+    error = open(error).read()
 
     if error != "":
         print(error)
@@ -29,66 +35,147 @@ def run(command):
     endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
     lifecycleTime = endTime - startTime
 
-    start = output.find("fetchBuilder start")
-    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-    end = output.find("fetchBuilder end")
-    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-    fetchBuilderTime = endTime - startTime
+    pullImageTime = datetime.timedelta()
+    start = output.find("NetWork I/O for pulling image start")
+    while start != -1:
+        startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+        end = output.find("NetWork I/O for pulling image end", start)
+        endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+        pullImageTime += endTime - startTime
+        start = output.find("NetWork I/O for pulling image start", end)
 
-    start = output.find("fetchBuildpack start")
-    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-    end = output.find("fetchBuildpack end")
-    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-    fetchBuildpackTime = endTime - startTime
+    downloadTime = datetime.timedelta()
+    start = output.find("NetWork I/O for downloading")
+    while start != -1:
+        startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+        end = output.find("NetWork I/O for downloading", start)
+        endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+        downloadTime += endTime - startTime
+        start = output.find("NetWork I/O for downloading", end)
 
-    return {"build": buildTime, "lifecycle": lifecycleTime, "fetchBuilder": fetchBuilderTime, "fetchBuildpack": fetchBuildpackTime}
+    start = output.find("I/O for saving builder start")
+    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+    end = output.find("I/O for saving builder end")
+    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+    saveBuilderTime = endTime - startTime
+
+    return {"build": buildTime, "lifecycle": lifecycleTime, "pullImage": pullImageTime, "download": downloadTime,
+            "saveBuilder": saveBuilderTime}
+
+
+def repeat(command, out):
+    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0), "pullImage": datetime.timedelta(0),
+                    "download": datetime.timedelta(0), "saveBuilder": datetime.timedelta(0)}
+    for i in range(N):
+        result = run(command, out)
+        if i < k:
+            continue
+        else:
+            for key in repeatResult.keys():
+                repeatResult[key] += result[key]
+
+    for value in repeatResult.values():
+        value /= N - k
+    return repeatResult
+
+
+def firstBuild(imageName):
+    builder = "paketobuildpacks/builder:base"
+    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0), "pullImage": datetime.timedelta(0),
+                    "download": datetime.timedelta(0), "saveBuilder": datetime.timedelta(0)}
+    for i in range(N):
+        command = PACK + " build " + imageName + "-" + datetime.datetime.now().strftime("%S.%f") + \
+                  " --builder " + builder + " --timestamps -v"
+        result = run(command, "first_build.out")
+        if i < k:
+            continue
+        else:
+            for key in repeatResult.keys():
+                repeatResult[key] += result[key]
+
+    for value in repeatResult.values():
+        value /= N - k
+    return repeatResult
 
 
 def laterBuild(imageName):
     builder = "paketobuildpacks/builder:base"
     command = PACK + " build " + imageName + " --builder " + builder + " --timestamps -v"
-    return run(command)
+    return repeat(command, "later_build.out")
 
 
 def tinyBuild(imageName):
     builder = "paketobuildpacks/builder:tiny"
     command = PACK + " build " + imageName + " --builder " + builder + " --timestamps -v"
-    return run(command)
+    return repeat(command, "tiny_build.out")
+
+
+def cacheImageBuild(imageName):
+    builder = "paketobuildpacks/builder:base"
+    command = PACK + " build " + imageName + " --builder " + builder + \
+              " --timestamps -v --cache type=build;format=image;name=paketo-demo-app;"
+    return repeat(command, "cache_image_build.out")
 
 
 def neverBuild(imageName):
     builder = "paketobuildpacks/builder:base"
     command = PACK + " build " + imageName + " --builder " + builder + " --pull-policy never --timestamps -v"
-    return run(command)
+    return repeat(command, "never_policy_build.out")
 
 
 def alwaysBuild(imageName):
     builder = "paketobuildpacks/builder:base"
     command = PACK + " build " + imageName + " --builder " + builder + " --pull-policy always --timestamps -v"
-    return run(command)
+    return repeat(command, "always_policy_build.out")
+
+
+def publishBuild(imageName):
+    builder = "paketobuildpacks/builder:base"
+    command = PACK + " build docker.io/" + username + "/" + imageName + ":latest --builder " + builder + " --publish --timestamps -v"
+    return repeat(command, "publish_build.out")
+
+
+def untrustedBuild(imageName):
+    origin = "paketobuildpacks/builder:base"
+    builder = "mybuilder:base"
+    command = "docker tag " + origin + " " + builder + " && " + \
+              PACK + " build " + imageName + " --builder " + builder + " --timestamps -v"
+    return repeat(command, "untrusted_build.out")
 
 
 def main():
     file = open("profiling.csv", "w")
-    file.write("condition, build, lifecycle, fetchBuilder, fetchBuildpack\n")
+    file.write("condition, build, lifecycle, pullImage, download, saveBuilder\n")
 
     imageName = "paketo-demo-app"
 
+    def output(taskName, result):
+        file.write(taskName + ", " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
+               str(result["pullImage"]) + ", " + str(result["download"]) + ", " + str(result["saveBuilder"]) + "\n")
+
+    result = firstBuild(imageName)
+    output("first build", result)
+
     result = laterBuild(imageName)
-    file.write("later build, " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["fetchBuilder"]) + ", " + str(result["fetchBuildpack"]) + "\n")
+    output("later build", result)
 
     result = tinyBuild(imageName)
-    file.write("tiny build, " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["fetchBuilder"]) + ", " + str(result["fetchBuildpack"]) + "\n")
+    output("tiny build", result)
+
+    result = cacheImageBuild(imageName)
+    output("cache image build", result)
 
     result = neverBuild(imageName)
-    file.write("never policy build, " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["fetchBuilder"]) + ", " + str(result["fetchBuildpack"]) + "\n")
+    output("never policy build", result)
 
     result = alwaysBuild(imageName)
-    file.write("always policy build, " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["fetchBuilder"]) + ", " + str(result["fetchBuildpack"]) + "\n")
+    output("always policy build", result)
+
+    result = publishBuild(imageName)
+    output("publish build", result)
+
+    result = untrustedBuild(imageName)
+    output("untrusted build", result)
 
     file.close()
 

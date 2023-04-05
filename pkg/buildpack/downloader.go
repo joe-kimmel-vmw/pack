@@ -126,7 +126,9 @@ func (c *buildpackDownloader) Download(ctx context.Context, moduleURI string, op
 
 		c.logger.Debugf("Downloading %s from URI: %s", kind, style.Symbol(moduleURI))
 
+		c.logger.Infof("Network I/O for downloading start")
 		blob, err := c.downloader.Download(ctx, moduleURI)
+		c.logger.Infof("Network I/O for downloading end")
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "downloading %s from %s", kind, style.Symbol(moduleURI))
 		}

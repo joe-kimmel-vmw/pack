@@ -84,6 +84,8 @@ func NewFetcher(logger logging.Logger, docker DockerClient, opts ...FetcherOptio
 var ErrNotFound = errors.New("not found")
 
 func (f *Fetcher) Fetch(ctx context.Context, name string, options FetchOptions) (imgutil.Image, error) {
+	f.logger.Infof("NetWork I/O for pulling image start")
+	defer f.logger.Infof("NetWork I/O for pulling image end")
 	name, err := pname.TranslateRegistry(name, f.registryMirrors, f.logger)
 	if err != nil {
 		return nil, err

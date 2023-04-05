@@ -441,6 +441,8 @@ func (b *Builder) Save(logger logging.Logger, creatorMetadata CreatorMetadata) e
 		return errors.Wrap(err, "failed to set working dir")
 	}
 
+	logger.Infof("I/O for saving builder start")
+	defer logger.Infof("I/O for saving builder end")
 	return b.image.Save()
 }
 

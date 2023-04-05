@@ -145,6 +145,7 @@ func Build(logger logging.Logger, cfg config.Config, packClient PackClient) *cob
 				return errors.Wrapf(err, "parsing creation time %s", flags.DateTime)
 			}
 			logger.Infof("build start")
+			defer logger.Infof("build end")
 			if err := packClient.Build(cmd.Context(), client.BuildOptions{
 				AppPath:           flags.AppPath,
 				Builder:           builder,
@@ -188,11 +189,9 @@ func Build(logger logging.Logger, cfg config.Config, packClient PackClient) *cob
 					LayoutRepoDir:      cfg.LayoutRepositoryDir,
 				},
 			}); err != nil {
-				logger.Infof("build end")
 				return errors.Wrap(err, "failed to build")
 			}
 			logger.Infof("Successfully built image %s", style.Symbol(inputImageName.Name()))
-			logger.Infof("build end")
 			return nil
 		}),
 	}

@@ -307,13 +307,10 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		return errors.Wrapf(err, "invalid builder '%s'", opts.Builder)
 	}
 
-	c.logger.Infof("fetchBuilder start")
 	rawBuilderImage, err := c.imageFetcher.Fetch(ctx, builderRef.Name(), image.FetchOptions{Daemon: true, PullPolicy: opts.PullPolicy})
 	if err != nil {
-		c.logger.Infof("fetchBuilder end")
 		return errors.Wrapf(err, "failed to fetch builder image '%s'", builderRef.Name())
 	}
-	c.logger.Infof("fetchBuilder end")
 
 	bldr, err := c.getBuilder(rawBuilderImage)
 	if err != nil {
@@ -348,13 +345,10 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		return err
 	}
 
-	c.logger.Infof("fetchBuildpack start")
 	fetchedBPs, order, err := c.processBuildpacks(ctx, bldr.Image(), bldr.Buildpacks(), bldr.Order(), bldr.StackID, opts)
 	if err != nil {
-		c.logger.Infof("fetchBuildpack end")
 		return err
 	}
-	c.logger.Infof("fetchBuildpack end")
 
 	if err := c.validateMixins(fetchedBPs, bldr, runImageName, runMixins); err != nil {
 		return errors.Wrap(err, "validating stack mixins")
