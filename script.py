@@ -10,6 +10,58 @@ username = "edithwu"
 N = 5
 k = 2
 
+labels = {"build": "build",
+          "lifecycle": "lifecycleExecutor",
+          "pullImage": "NetWork I/O for pulling image",
+          "download": "NetWork I/O for downloading",
+          "saveBuilder": "I/O for saving builder",
+          "parseImageReference": "parse image reference",
+          "processAppPath": "process app path",
+          "processProxyConfig": "process proxy config",
+          "processBuilderName": "process builder name",
+          "getBuilder": "get builder",
+          "resolveRunImage": "resolve run image",
+          "validateRunImage": "validate run image",
+          "processBuildpack": "process buildpack",
+          "validateMixins": "validate mixins",
+          "createEphemeralBuilder": "create ephemeral builder",
+          "processVolume": "process volume",
+          "getFileFilter": "get file filter",
+          "translateRegistry": "translate registry",
+          "stackMixins": "stack mixins",
+          "allBuildpacks": "all buildpacks",
+          "assembleAvailableMixins": "assemble availble mixins",
+          "ensureStackSupport": "ensure stack support",
+          "createNewBuilder": "create new builder",
+          "addBuildpack": "add buildpack",
+          "outputBuildpack": "output buildpack",
+          "makeDirectoryTemp": "make directory temp",
+          "getDefaultDirectoryLayer": "get default directory layer",
+          "addDefaultDirectoryLayer": "add default directory layer",
+          "validateBuildpacks": "validate buildpacks",
+          "validateExtensions": "validate extensions",
+          "getBuildpackLabel": "get buildpack label",
+          "addBuildpackModule": "add buildpack module",
+          "setBuildpackLabel": "set buildpack label",
+          "getExtensionLabel": "get extension label",
+          "addExtensionModule": "add extension module",
+          "setExtensionLabel": "set extension label",
+          "getStackLayer": "get stack layer",
+          "addStackLayer": "add stack layer",
+          "getEnvironmentLayer": "get environment layer",
+          "addEnvironmentLayer": "add environment layer",
+          "setMetaLabel": "set meta label",
+          "setMixinsLabel": "set mixins label",
+          "setWorkingDirectory": "set working directory",
+          "getLifecycleLayer": "get lifecycle layer",
+          "addLifecycleLayer": "add lifecycle layer",
+          "processBuildpackOrder": "process buildpack order",
+          "processExtensionOrder": "process extension order",
+          "getOrderLayer": "get order layer",
+          "addOrderLayer": "add order layer",
+          "setBuildpackOrderLayer": "set buildpack order layer",
+          "setExtensionOrderLayer": "set extension order layer"
+          }
 
 def run(command, out, error="error.out"):
     print(command)
@@ -28,73 +80,43 @@ def run(command, out, error="error.out"):
         start = output.find(label + " start")
         while start != -1:
             startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-            end = output.find(label + " start", start)
+            end = output.find(label + " end", start)
             endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
             time += endTime - startTime
-            start = output.find(label + " end", end)
+
+            # remove time spent on pulling image from validating run image
+            if label == labels["validateRunImage"]:
+                start = output.find(labels["pullImage"] + " start", start, end)
+                if start != -1:
+                    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+                    end = output.find(labels["pullImage"] + " end", start)
+                    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+                    time -= endTime - startTime
+
+            # remove time spent on saving builder from creating ephemeral builder
+            if label == labels["createEphemeralBuilder"]:
+                start = output.find(labels["saveBuilder"] + " start", start, end)
+                if start != -1:
+                    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+                    end = output.find(labels["saveBuilder"] + " end", start)
+                    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+                    time -= endTime - startTime
+
+            start = output.find(label + " start", end)
 
         return time
 
-    buildTime = calculateTime("build")
+    result = {}
+    for key in labels.keys():
+        result[key] = calculateTime(labels[key])
 
-    lifecycleTime = calculateTime("lifecycleExecutor")
-
-    pullImageTime = calculateTime("NetWork I/O for pulling image")
-
-    downloadTime = calculateTime("NetWork I/O for downloading")
-
-    saveBuilderTime = calculateTime("I/O for saving builder")
-
-    nonblockingTime = buildTime - lifecycleTime - pullImageTime - downloadTime - saveBuilderTime
-
-    parseImageReferenceTime = calculateTime("parse image reference")
-
-    processAppPathTime = calculateTime("process app path")
-
-    processProxyConfigTime = calculateTime("process proxy config")
-
-    processBuilderNameTime = calculateTime("process builder name")
-
-    getBuilderTime = calculateTime("get builder")
-
-    resolveRunImageTime = calculateTime("resolve run image")
-
-    validateRunImageTime = calculateTime("validate run image")
-
-    processBuildpackTime = calculateTime("process buildpack")
-
-    validateMixinsTime = calculateTime("validate mixins")
-
-    createEphemeralBuilderTime = calculateTime("create ephemeral builder")
-
-    processVolumeTime = calculateTime("process volume")
-
-    getFileFilterTime = calculateTime("get file filter")
-
-    translateRegistryTime = calculateTime("translate registry")
-
-    return {"build": buildTime, "lifecycle": lifecycleTime, "pullImage": pullImageTime, "download": downloadTime,
-            "saveBuilder": saveBuilderTime, "non-blocking": nonblockingTime,
-            "parseImageReference": parseImageReferenceTime, "processAppPath": processAppPathTime,
-            "processProxyConfig": processProxyConfigTime, "processBuilderName": processBuilderNameTime,
-            "getBuilder": getBuilderTime, "resolveRunImage": resolveRunImageTime, "validateRunImage": validateRunImageTime,
-            "processBuildpack": processBuildpackTime, "validateMixins": validateMixinsTime,
-            "createEphemeralBuilder": createEphemeralBuilderTime, "processVolume": processVolumeTime,
-            "getFileFilter": getFileFilterTime, "translateRegistry": translateRegistryTime}
+    return result
 
 
 def repeat(command, out):
-    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0),
-                    "pullImage": datetime.timedelta(0),"download": datetime.timedelta(0),
-                    "saveBuilder": datetime.timedelta(0), "non-blocking": datetime.timedelta(0),
-                    "parseImageReference": datetime.timedelta(0), "processAppPath": datetime.timedelta(0),
-                    "processProxyConfig": datetime.timedelta(0), "processBuilderName": datetime.timedelta(0),
-                    "getBuilder": datetime.timedelta(0), "resolveRunImage": datetime.timedelta(0),
-                    "validateRunImage": datetime.timedelta(0),
-                    "processBuildpack": datetime.timedelta(0), "validateMixins": datetime.timedelta(0),
-                    "createEphemeralBuilder": datetime.timedelta(0), "processVolume": datetime.timedelta(0),
-                    "getFileFilter": datetime.timedelta(0), "translateRegistry": datetime.timedelta(0)
-                    }
+    repeatResult = {}
+    for key in labels.keys():
+        repeatResult[key] = datetime.timedelta(0)
     for i in range(N):
         result = run(command, out)
         if i < k:
@@ -110,17 +132,9 @@ def repeat(command, out):
 
 def firstBuild(imageName):
     builder = "paketobuildpacks/builder:base"
-    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0),
-                    "pullImage": datetime.timedelta(0), "download": datetime.timedelta(0),
-                    "saveBuilder": datetime.timedelta(0), "non-blocking": datetime.timedelta(0),
-                    "parseImageReference": datetime.timedelta(0), "processAppPath": datetime.timedelta(0),
-                    "processProxyConfig": datetime.timedelta(0), "processBuilderName": datetime.timedelta(0),
-                    "getBuilder": datetime.timedelta(0), "resolveRunImage": datetime.timedelta(0),
-                    "validateRunImage": datetime.timedelta(0),
-                    "processBuildpack": datetime.timedelta(0), "validateMixins": datetime.timedelta(0),
-                    "createEphemeralBuilder": datetime.timedelta(0), "processVolume": datetime.timedelta(0),
-                    "getFileFilter": datetime.timedelta(0), "translateRegistry": datetime.timedelta(0)
-                    }
+    repeatResult = {}
+    for key in labels.keys():
+        repeatResult[key] = datetime.timedelta(0)
     for i in range(N):
         command = PACK + " build " + imageName + "-" + datetime.datetime.now().strftime("%S.%f") + \
                   " --builder " + builder + " --timestamps -v"
@@ -183,14 +197,18 @@ def untrustedBuild(imageName):
 
 def main():
     file = open("profiling.csv", "w")
-    file.write("condition, build, lifecycle, pullImage, download, saveBuilder, non-blocking\n")
+    file.write("condition")
+    for key in labels.keys():
+        file.write(", " + key)
+    file.write("\n")
 
     imageName = "paketo-demo-app"
 
     def output(taskName, result):
-        file.write(taskName + ", " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["pullImage"]) + ", " + str(result["download"]) + ", " + str(result["saveBuilder"]) +
-                   str(result["non-blocking"]) + "\n")
+        file.write(taskName)
+        for key in labels.keys():
+            file.write(", " + str(result[key]))
+        file.write("\n")
 
     result = firstBuild(imageName)
     output("first build", result)

@@ -313,115 +313,176 @@ func (b *Builder) SetStack(stackConfig builder.StackConfig) {
 // Save saves the builder
 func (b *Builder) Save(logger logging.Logger, creatorMetadata CreatorMetadata) error {
 	logger.Debugf("Creating builder with the following buildpacks:")
+	logger.Infof("output buildpack start")
 	for _, bpInfo := range b.metadata.Buildpacks {
 		logger.Debugf("-> %s", style.Symbol(bpInfo.FullName()))
 	}
+	logger.Infof("output buildpack end")
 
+	logger.Infof("make directory temp start")
 	tmpDir, err := os.MkdirTemp("", "create-builder-scratch")
+	logger.Infof("make directory temp end")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
 
+	logger.Infof("get default directory layer start")
 	dirsTar, err := b.defaultDirsLayer(tmpDir)
+	logger.Infof("get default directory layer end")
 	if err != nil {
 		return err
 	}
+	logger.Infof("add default directory layer start")
 	if err := b.image.AddLayer(dirsTar); err != nil {
+		logger.Infof("add default directory layer end")
 		return errors.Wrap(err, "adding default dirs layer")
 	}
+	logger.Infof("add default directory layer end")
 
 	if b.lifecycle != nil {
 		lifecycleDescriptor := b.lifecycle.Descriptor()
 		b.metadata.Lifecycle.LifecycleInfo = lifecycleDescriptor.Info
 		b.metadata.Lifecycle.API = lifecycleDescriptor.API
 		b.metadata.Lifecycle.APIs = lifecycleDescriptor.APIs
+		logger.Infof("get lifecycle layer start")
 		lifecycleTar, err := b.lifecycleLayer(tmpDir)
+		logger.Infof("get lifecycle layer end")
 		if err != nil {
 			return err
 		}
+		logger.Infof("add lifecycle layer start")
 		if err := b.image.AddLayer(lifecycleTar); err != nil {
+			logger.Infof("add lifecycle layer end")
 			return errors.Wrap(err, "adding lifecycle layer")
 		}
+		logger.Infof("add lifecycle layer end")
 	}
 
+	logger.Infof("validate buildpacks start")
 	if err := validateBuildpacks(b.StackID, b.Mixins(), b.LifecycleDescriptor(), b.Buildpacks(), b.additionalBuildpacks); err != nil {
+		logger.Infof("validates buildpack end")
 		return errors.Wrap(err, "validating buildpacks")
 	}
+	logger.Infof("validate buildpacks end")
 
+	logger.Infof("validate extensions start")
 	if err := validateExtensions(b.lifecycleDescriptor, b.Extensions(), b.additionalExtensions); err != nil {
+		logger.Infof("validate extensions end")
 		return errors.Wrap(err, "validating extensions")
 	}
+	logger.Infof("validate extensions end")
 
+	logger.Infof("get buildpack label start")
 	bpLayers := dist.ModuleLayers{}
 	if _, err := dist.GetLabel(b.image, dist.BuildpackLayersLabel, &bpLayers); err != nil {
+		logger.Infof("get buildpack label end")
 		return errors.Wrapf(err, "getting label %s", dist.BuildpackLayersLabel)
 	}
+	logger.Infof("get buildpack label end")
+	logger.Infof("add buildpack module start")
 	err = b.addModules(buildpack.KindBuildpack, logger, tmpDir, b.image, b.additionalBuildpacks, bpLayers)
+	logger.Infof("add buildpack module end")
 	if err != nil {
 		return err
 	}
+	logger.Infof("set buildpack label start")
 	if err := dist.SetLabel(b.image, dist.BuildpackLayersLabel, bpLayers); err != nil {
+		logger.Infof("set buildpack label end")
 		return err
 	}
+	logger.Infof("set buildpack label end")
 
+	logger.Infof("get extension label start")
 	extLayers := dist.ModuleLayers{}
 	if _, err := dist.GetLabel(b.image, dist.ExtensionLayersLabel, &extLayers); err != nil {
+		logger.Infof("get extension label end")
 		return errors.Wrapf(err, "getting label %s", dist.ExtensionLayersLabel)
 	}
+	logger.Infof("get extension label end")
+	logger.Infof("add extension module start")
 	err = b.addModules(buildpack.KindExtension, logger, tmpDir, b.image, b.additionalExtensions, extLayers)
+	logger.Infof("add extension module end")
 	if err != nil {
 		return err
 	}
+	logger.Infof("set extension label start")
 	if err := dist.SetLabel(b.image, dist.ExtensionLayersLabel, extLayers); err != nil {
+		logger.Infof("set extension label end")
 		return err
 	}
+	logger.Infof("set extension label end")
 
 	if b.replaceOrder {
+		logger.Infof("process buildpack order start")
 		resolvedOrderBp, err := processOrder(b.metadata.Buildpacks, b.order, buildpack.KindBuildpack)
+		logger.Infof("process buildpack order end")
 		if err != nil {
 			return errors.Wrap(err, "processing buildpacks order")
 		}
+		logger.Infof("process extension order start")
 		resolvedOrderExt, err := processOrder(b.metadata.Extensions, b.orderExtensions, buildpack.KindExtension)
+		logger.Infof("process extension order end")
 		if err != nil {
 			return errors.Wrap(err, "processing extensions order")
 		}
 
+		logger.Infof("get order layer start")
 		orderTar, err := b.orderLayer(resolvedOrderBp, resolvedOrderExt, tmpDir)
+		logger.Infof("get order layer end")
 		if err != nil {
 			return err
 		}
+		logger.Infof("add order layer start")
 		if err := b.image.AddLayer(orderTar); err != nil {
+			logger.Infof("add order layer end")
 			return errors.Wrap(err, "adding order.tar layer")
 		}
+		logger.Infof("add order layer end")
+		logger.Infof("set buildpack order layer start")
 		if err := dist.SetLabel(b.image, OrderLabel, b.order); err != nil {
+			logger.Infof("set buildpack order layer end")
 			return err
 		}
+		logger.Infof("set buildpack order layer end")
+		logger.Infof("set extension order layer start")
 		if err := dist.SetLabel(b.image, OrderExtensionsLabel, b.orderExtensions); err != nil {
+			logger.Infof("set extension order layer end")
 			return err
 		}
+		logger.Infof("set extension order layer end")
 	}
 
+	logger.Infof("get stack layer start")
 	stackTar, err := b.stackLayer(tmpDir)
+	logger.Infof("get stack layer end")
 	if err != nil {
 		return err
 	}
+	logger.Infof("add stack layer start")
 	if err := b.image.AddLayer(stackTar); err != nil {
+		logger.Infof("add stack layer end")
 		return errors.Wrap(err, "adding stack.tar layer")
 	}
+	logger.Infof("add stack layer end")
 
 	if len(b.env) > 0 {
 		logger.Debugf("Provided Environment Variables\n  %s", style.Map(b.env, "  ", "\n"))
 	}
 
+	logger.Infof("get environment layer start")
 	envTar, err := b.envLayer(tmpDir, b.env)
+	logger.Infof("get environment layer end")
 	if err != nil {
 		return err
 	}
 
+	logger.Infof("add environment layer start")
 	if err := b.image.AddLayer(envTar); err != nil {
+		logger.Infof("add environment layer end")
 		return errors.Wrap(err, "adding env layer")
 	}
+	logger.Infof("add environment layer end")
 
 	if creatorMetadata.Name == "" {
 		creatorMetadata.Name = packName
@@ -429,17 +490,26 @@ func (b *Builder) Save(logger logging.Logger, creatorMetadata CreatorMetadata) e
 
 	b.metadata.CreatedBy = creatorMetadata
 
+	logger.Infof("set meta label start")
 	if err := dist.SetLabel(b.image, metadataLabel, b.metadata); err != nil {
+		logger.Infof("set meta label end")
 		return err
 	}
+	logger.Infof("set meta label end")
 
+	logger.Infof("set mixins label start")
 	if err := dist.SetLabel(b.image, stack.MixinsLabel, b.mixins); err != nil {
+		logger.Infof("set mixins label end")
 		return err
 	}
+	logger.Infof("set mixins label end")
 
+	logger.Infof("set working directory start")
 	if err := b.image.SetWorkingDir(layersDir); err != nil {
+		logger.Infof("set working directory end")
 		return errors.Wrap(err, "failed to set working dir")
 	}
+	logger.Infof("set working directory end")
 
 	logger.Infof("I/O for saving builder start")
 	defer logger.Infof("I/O for saving builder end")

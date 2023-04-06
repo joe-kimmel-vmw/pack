@@ -656,16 +656,26 @@ func (c *Client) validateRunImage(context context.Context, name string, opts ima
 func (c *Client) validateMixins(additionalBuildpacks []buildpack.BuildModule, bldr *builder.Builder, runImageName string, runMixins []string) error {
 	c.logger.Infof("validate mixins start")
 	defer c.logger.Infof("validate mixins end")
+
+	c.logger.Infof("stack mixins start")
 	if err := stack.ValidateMixins(bldr.Image().Name(), bldr.Mixins(), runImageName, runMixins); err != nil {
+		c.logger.Infof("stack mixins end")
 		return err
 	}
+	c.logger.Infof("stack mixins end")
 
+	c.logger.Infof("all buildpacks start")
 	bps, err := allBuildpacks(bldr.Image(), additionalBuildpacks)
+	c.logger.Infof("all buildpacks end")
 	if err != nil {
 		return err
 	}
+	c.logger.Infof("assemble availble mixins start")
 	mixins := assembleAvailableMixins(bldr.Mixins(), runMixins)
+	c.logger.Infof("assemble availble mixins end")
 
+	c.logger.Infof("ensure stack support start")
+	defer c.logger.Infof("ensure stack support end")
 	for _, bp := range bps {
 		if err := bp.EnsureStackSupport(bldr.StackID, mixins, true); err != nil {
 			return err
@@ -1097,17 +1107,22 @@ func (c *Client) createEphemeralBuilder(rawBuilderImage imgutil.Image, env map[s
 	c.logger.Infof("create ephemeral builder start")
 	defer c.logger.Infof("create ephemeral builder end")
 	origBuilderName := rawBuilderImage.Name()
+
+	c.logger.Infof("create new builder start")
 	bldr, err := builder.New(rawBuilderImage, fmt.Sprintf("pack.local/builder/%x:latest", randString(10)))
+	c.logger.Infof("create new builder end")
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid builder %s", style.Symbol(origBuilderName))
 	}
 
 	bldr.SetEnv(env)
+	c.logger.Infof("add buildpack start")
 	for _, bp := range buildpacks {
 		bpInfo := bp.Descriptor().Info()
 		c.logger.Debugf("Adding buildpack %s version %s to builder", style.Symbol(bpInfo.ID), style.Symbol(bpInfo.Version))
 		bldr.AddBuildpack(bp)
 	}
+	c.logger.Infof("add buildpack end")
 	if len(order) > 0 && len(order[0].Group) > 0 {
 		c.logger.Debug("Setting custom order")
 		bldr.SetOrder(order)
