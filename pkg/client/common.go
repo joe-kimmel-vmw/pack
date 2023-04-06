@@ -29,6 +29,8 @@ func (c *Client) parseTagReference(imageName string) (name.Reference, error) {
 }
 
 func (c *Client) resolveRunImage(runImage, imgRegistry, bldrRegistry string, stackInfo builder.StackMetadata, additionalMirrors map[string][]string, publish bool) string {
+	c.logger.Infof("resolve run image start")
+	defer c.logger.Infof("resolve run image end")
 	if runImage != "" {
 		c.logger.Debugf("Using provided run-image %s", style.Symbol(runImage))
 		return runImage

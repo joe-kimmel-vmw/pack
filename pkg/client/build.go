@@ -400,7 +400,9 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		opts.ContainerConfig.Volumes = appendLayoutVolumes(opts.ContainerConfig.Volumes, pathsConfig)
 	}
 
+	c.logger.Infof("process volume start")
 	processedVolumes, warnings, err := processVolumes(imgOS, opts.ContainerConfig.Volumes)
+	c.logger.Infof("process volume end")
 	if err != nil {
 		return err
 	}
@@ -409,12 +411,16 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		c.logger.Warn(warning)
 	}
 
+	c.logger.Infof("get file filter start")
 	fileFilter, err := getFileFilter(opts.ProjectDescriptor)
+	c.logger.Infof("get file filter end")
 	if err != nil {
 		return err
 	}
 
+	c.logger.Infof("translate registry start")
 	runImageName, err = pname.TranslateRegistry(runImageName, c.registryMirrors, c.logger)
+	c.logger.Infof("translate registry end")
 	if err != nil {
 		return err
 	}
@@ -594,6 +600,8 @@ func supportsPlatformAPI(builderPlatformAPIs builder.APISet) bool {
 }
 
 func (c *Client) processBuilderName(builderName string) (name.Reference, error) {
+	c.logger.Infof("process builder name start")
+	defer c.logger.Infof("process builder name end")
 	if builderName == "" {
 		return nil, errors.New("builder is a required parameter if the client has no default builder")
 	}
@@ -601,6 +609,8 @@ func (c *Client) processBuilderName(builderName string) (name.Reference, error) 
 }
 
 func (c *Client) getBuilder(img imgutil.Image) (*builder.Builder, error) {
+	c.logger.Infof("get builder start")
+	defer c.logger.Infof("get builder end")
 	bldr, err := builder.FromImage(img)
 	if err != nil {
 		return nil, err
@@ -624,6 +634,8 @@ func (c *Client) getBuilder(img imgutil.Image) (*builder.Builder, error) {
 }
 
 func (c *Client) validateRunImage(context context.Context, name string, opts image.FetchOptions, expectedStack string) (imgutil.Image, error) {
+	c.logger.Infof("validate run image start")
+	defer c.logger.Infof("validate run image end")
 	if name == "" {
 		return nil, errors.New("run image must be specified")
 	}
@@ -642,6 +654,8 @@ func (c *Client) validateRunImage(context context.Context, name string, opts ima
 }
 
 func (c *Client) validateMixins(additionalBuildpacks []buildpack.BuildModule, bldr *builder.Builder, runImageName string, runMixins []string) error {
+	c.logger.Infof("validate mixins start")
+	defer c.logger.Infof("validate mixins end")
 	if err := stack.ValidateMixins(bldr.Image().Name(), bldr.Mixins(), runImageName, runMixins); err != nil {
 		return err
 	}
@@ -725,6 +739,8 @@ func allBuildpacks(builderImage imgutil.Image, additionalBuildpacks []buildpack.
 }
 
 func (c *Client) processAppPath(appPath string) (string, error) {
+	c.logger.Infof("process app path start")
+	defer c.logger.Infof("process app path end")
 	var (
 		resolvedAppPath string
 		err             error
@@ -767,6 +783,8 @@ func (c *Client) processAppPath(appPath string) (string, error) {
 // local full path and the expected path in the lifecycle container for both images provides. Those values
 // can be used to mount the correct volumes
 func (c *Client) processLayoutPath(inputImageRef, previousImageRef InputImageReference) (layoutPathConfig, error) {
+	c.logger.Infof("process layout path start")
+	defer c.logger.Infof("process layout path end")
 	var (
 		hostImagePath, hostPreviousImagePath, targetImagePath, targetPreviousImagePath string
 		err                                                                            error
@@ -803,6 +821,8 @@ func (c *Client) processLayoutPath(inputImageRef, previousImageRef InputImageRef
 }
 
 func (c *Client) parseReference(opts BuildOptions) (name.Reference, error) {
+	c.logger.Infof("parse image reference start")
+	defer c.logger.Infof("parse image reference end")
 	if !opts.Layout() {
 		return c.parseTagReference(opts.Image)
 	}
@@ -811,6 +831,8 @@ func (c *Client) parseReference(opts BuildOptions) (name.Reference, error) {
 }
 
 func (c *Client) processProxyConfig(config *ProxyConfig) ProxyConfig {
+	c.logger.Infof("process proxy config start")
+	defer c.logger.Infof("process proxy config end")
 	var (
 		httpProxy, httpsProxy, noProxy string
 		ok                             bool
@@ -879,6 +901,8 @@ func (c *Client) processProxyConfig(config *ProxyConfig) ProxyConfig {
 //		- group:
 //			- A
 func (c *Client) processBuildpacks(ctx context.Context, builderImage imgutil.Image, builderBPs []dist.ModuleInfo, builderOrder dist.Order, stackID string, opts BuildOptions) (fetchedBPs []buildpack.BuildModule, order dist.Order, err error) {
+	c.logger.Infof("process buildpack start")
+	defer c.logger.Infof("process buildpack end")
 	relativeBaseDir := opts.RelativeBaseDir
 	declaredBPs := opts.Buildpacks
 
@@ -1070,6 +1094,8 @@ func prependBuildpackToOrder(order dist.Order, bpInfo dist.ModuleInfo) (newOrder
 }
 
 func (c *Client) createEphemeralBuilder(rawBuilderImage imgutil.Image, env map[string]string, order dist.Order, buildpacks []buildpack.BuildModule) (*builder.Builder, error) {
+	c.logger.Infof("create ephemeral builder start")
+	defer c.logger.Infof("create ephemeral builder end")
 	origBuilderName := rawBuilderImage.Name()
 	bldr, err := builder.New(rawBuilderImage, fmt.Sprintf("pack.local/builder/%x:latest", randString(10)))
 	if err != nil {

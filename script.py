@@ -23,49 +23,78 @@ def run(command, out, error="error.out"):
     if error != "":
         print(error)
 
-    start = output.find("build start")
-    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-    end = output.find("build end")
-    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-    buildTime = endTime - startTime
+    def calculateTime(label):
+        time = datetime.timedelta()
+        start = output.find(label + " start")
+        while start != -1:
+            startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
+            end = output.find(label + " start", start)
+            endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
+            time += endTime - startTime
+            start = output.find(label + " end", end)
 
-    start = output.find("lifecycleExecutor start")
-    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-    end = output.find("lifecycleExecutor end")
-    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-    lifecycleTime = endTime - startTime
+        return time
 
-    pullImageTime = datetime.timedelta()
-    start = output.find("NetWork I/O for pulling image start")
-    while start != -1:
-        startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-        end = output.find("NetWork I/O for pulling image end", start)
-        endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-        pullImageTime += endTime - startTime
-        start = output.find("NetWork I/O for pulling image start", end)
+    buildTime = calculateTime("build")
 
-    downloadTime = datetime.timedelta()
-    start = output.find("NetWork I/O for downloading")
-    while start != -1:
-        startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-        end = output.find("NetWork I/O for downloading", start)
-        endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-        downloadTime += endTime - startTime
-        start = output.find("NetWork I/O for downloading", end)
+    lifecycleTime = calculateTime("lifecycleExecutor")
 
-    start = output.find("I/O for saving builder start")
-    startTime = datetime.datetime.strptime(output[output.rfind('\n', 0, start):start].strip(), format)
-    end = output.find("I/O for saving builder end")
-    endTime = datetime.datetime.strptime(output[output.rfind('\n', 0, end):end].strip(), format)
-    saveBuilderTime = endTime - startTime
+    pullImageTime = calculateTime("NetWork I/O for pulling image")
+
+    downloadTime = calculateTime("NetWork I/O for downloading")
+
+    saveBuilderTime = calculateTime("I/O for saving builder")
+
+    nonblockingTime = buildTime - lifecycleTime - pullImageTime - downloadTime - saveBuilderTime
+
+    parseImageReferenceTime = calculateTime("parse image reference")
+
+    processAppPathTime = calculateTime("process app path")
+
+    processProxyConfigTime = calculateTime("process proxy config")
+
+    processBuilderNameTime = calculateTime("process builder name")
+
+    getBuilderTime = calculateTime("get builder")
+
+    resolveRunImageTime = calculateTime("resolve run image")
+
+    validateRunImageTime = calculateTime("validate run image")
+
+    processBuildpackTime = calculateTime("process buildpack")
+
+    validateMixinsTime = calculateTime("validate mixins")
+
+    createEphemeralBuilderTime = calculateTime("create ephemeral builder")
+
+    processVolumeTime = calculateTime("process volume")
+
+    getFileFilterTime = calculateTime("get file filter")
+
+    translateRegistryTime = calculateTime("translate registry")
 
     return {"build": buildTime, "lifecycle": lifecycleTime, "pullImage": pullImageTime, "download": downloadTime,
-            "saveBuilder": saveBuilderTime}
+            "saveBuilder": saveBuilderTime, "non-blocking": nonblockingTime,
+            "parseImageReference": parseImageReferenceTime, "processAppPath": processAppPathTime,
+            "processProxyConfig": processProxyConfigTime, "processBuilderName": processBuilderNameTime,
+            "getBuilder": getBuilderTime, "resolveRunImage": resolveRunImageTime, "validateRunImage": validateRunImageTime,
+            "processBuildpack": processBuildpackTime, "validateMixins": validateMixinsTime,
+            "createEphemeralBuilder": createEphemeralBuilderTime, "processVolume": processVolumeTime,
+            "getFileFilter": getFileFilterTime, "translateRegistry": translateRegistryTime}
 
 
 def repeat(command, out):
-    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0), "pullImage": datetime.timedelta(0),
-                    "download": datetime.timedelta(0), "saveBuilder": datetime.timedelta(0)}
+    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0),
+                    "pullImage": datetime.timedelta(0),"download": datetime.timedelta(0),
+                    "saveBuilder": datetime.timedelta(0), "non-blocking": datetime.timedelta(0),
+                    "parseImageReference": datetime.timedelta(0), "processAppPath": datetime.timedelta(0),
+                    "processProxyConfig": datetime.timedelta(0), "processBuilderName": datetime.timedelta(0),
+                    "getBuilder": datetime.timedelta(0), "resolveRunImage": datetime.timedelta(0),
+                    "validateRunImage": datetime.timedelta(0),
+                    "processBuildpack": datetime.timedelta(0), "validateMixins": datetime.timedelta(0),
+                    "createEphemeralBuilder": datetime.timedelta(0), "processVolume": datetime.timedelta(0),
+                    "getFileFilter": datetime.timedelta(0), "translateRegistry": datetime.timedelta(0)
+                    }
     for i in range(N):
         result = run(command, out)
         if i < k:
@@ -81,8 +110,17 @@ def repeat(command, out):
 
 def firstBuild(imageName):
     builder = "paketobuildpacks/builder:base"
-    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0), "pullImage": datetime.timedelta(0),
-                    "download": datetime.timedelta(0), "saveBuilder": datetime.timedelta(0)}
+    repeatResult = {"build": datetime.timedelta(0), "lifecycle": datetime.timedelta(0),
+                    "pullImage": datetime.timedelta(0), "download": datetime.timedelta(0),
+                    "saveBuilder": datetime.timedelta(0), "non-blocking": datetime.timedelta(0),
+                    "parseImageReference": datetime.timedelta(0), "processAppPath": datetime.timedelta(0),
+                    "processProxyConfig": datetime.timedelta(0), "processBuilderName": datetime.timedelta(0),
+                    "getBuilder": datetime.timedelta(0), "resolveRunImage": datetime.timedelta(0),
+                    "validateRunImage": datetime.timedelta(0),
+                    "processBuildpack": datetime.timedelta(0), "validateMixins": datetime.timedelta(0),
+                    "createEphemeralBuilder": datetime.timedelta(0), "processVolume": datetime.timedelta(0),
+                    "getFileFilter": datetime.timedelta(0), "translateRegistry": datetime.timedelta(0)
+                    }
     for i in range(N):
         command = PACK + " build " + imageName + "-" + datetime.datetime.now().strftime("%S.%f") + \
                   " --builder " + builder + " --timestamps -v"
@@ -145,13 +183,14 @@ def untrustedBuild(imageName):
 
 def main():
     file = open("profiling.csv", "w")
-    file.write("condition, build, lifecycle, pullImage, download, saveBuilder\n")
+    file.write("condition, build, lifecycle, pullImage, download, saveBuilder, non-blocking\n")
 
     imageName = "paketo-demo-app"
 
     def output(taskName, result):
         file.write(taskName + ", " + str(result["build"]) + ", " + str(result["lifecycle"]) + ", " +
-               str(result["pullImage"]) + ", " + str(result["download"]) + ", " + str(result["saveBuilder"]) + "\n")
+               str(result["pullImage"]) + ", " + str(result["download"]) + ", " + str(result["saveBuilder"]) +
+                   str(result["non-blocking"]) + "\n")
 
     result = firstBuild(imageName)
     output("first build", result)
