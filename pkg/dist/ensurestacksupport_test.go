@@ -39,24 +39,24 @@ func BenchmarkAndProfileEnsureStackSupport(b *testing.B) {
 		}
 	}
 
+	bp = dist.BuildpackDescriptor{
+		WithInfo: dist.ModuleInfo{
+			ID:      "some.buildpack.id",
+			Version: "some.buildpack.version",
+		},
+		WithStacks: []dist.Stack{{
+			ID:     "*",
+			Mixins: []string{"mixinA", "build:mixinB", "run:mixinD"},
+		}},
+	}
+
+	providedMixins = []string{"mixinA", "build:mixinB", "mixinC"}
+	for n := 0; n < b.N; n++ {
+		if bp.EnsureStackSupport("some.stack.id", providedMixins, false) != nil {
+			panic("we failed the unit test")
+		}
+	}
 	/*
-
-				it("works with wildcard stack", func() {
-					bp := dist.BuildpackDescriptor{
-						WithInfo: dist.ModuleInfo{
-							ID:      "some.buildpack.id",
-							Version: "some.buildpack.version",
-						},
-						WithStacks: []dist.Stack{{
-							ID:     "*",
-							Mixins: []string{"mixinA", "build:mixinB", "run:mixinD"},
-						}},
-					}
-
-					providedMixins := []string{"mixinA", "build:mixinB", "mixinC"}
-					h.AssertNil(t, bp.EnsureStackSupport("some.stack.id", providedMixins, false))
-				})
-
 				it("returns an error with any missing (and non-ignored) mixins", func() {
 					bp := dist.BuildpackDescriptor{
 						WithInfo: dist.ModuleInfo{
